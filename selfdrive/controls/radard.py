@@ -297,8 +297,8 @@ def main():
 
   # import the radar from the fingerprint
   cloudlog.info("radard is importing %s", CP.carName)
-  RadarInterface = importlib.import_module(f'selfdrive.car.{CP.carName}.radar_interface').RadarInterface
-
+  #RadarInterface = importlib.import_module(f'selfdrive.car.{CP.carName}.radar_interface').RadarInterface
+  from selfdrive.car.continental.radar_interface import RadarInterface
   # *** setup messaging
   can_sock = messaging.sub_sock('can')
   sm = messaging.SubMaster(['modelV2', 'carState'], frequency=int(1./DT_CTRL))
