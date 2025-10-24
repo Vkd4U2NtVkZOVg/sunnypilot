@@ -325,16 +325,6 @@ class RadarInterface(RadarInterfaceBase):
     #     pass
     #   entry_w["measured"] = True
     #   self.cycle_ids.add(oid_w)
-
-    # 触发判定：仅在收到触发帧（Obj_0_Status / 0x60A）时输出一个周期；
-    # 若尚未触发，返回 None，但缓冲继续累积对象数据，等待后续批次触发。
-    ##*---------------------------触发判定开始---------------------------
-    # 日志：记录本批次 updated_messages 的地址集合
-    try:
-      _msgs_hex = ','.join([f"0x{addr:03X}" for addr in sorted(self.updated_messages)])
-      _write_custom_log_line(f"ARS408 updated_messages: [{_msgs_hex}]")
-    except Exception:
-      pass
     # 触发判定：仅在收到触发帧（Obj_0_Status / 0x60A）时输出一个周期；
     # 若尚未触发，返回 None，但缓冲继续累积对象数据，等待后续批次触发。
     if self.trigger_msg not in self.updated_messages:
