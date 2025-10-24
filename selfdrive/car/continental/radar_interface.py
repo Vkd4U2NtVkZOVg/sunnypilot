@@ -103,7 +103,7 @@ class RadarInterface(RadarInterfaceBase):
       msgs_hex = []
       for m in can_strings:
         if isinstance(m, (bytes, bytearray, memoryview)):
-          msgs_hex.append(m.hex().upper())
+          msgs_hex.append(" ".join(f"{b:02X}" for b in m))
         else:
           # 已是字符串或其他类型时，直接记录其字符串表示，避免抛异常
           msgs_hex.append(str(m))
