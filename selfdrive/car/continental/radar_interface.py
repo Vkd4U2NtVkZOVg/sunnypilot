@@ -172,6 +172,9 @@ class RadarInterface(RadarInterfaceBase):
     ids_ext = obj_ext.get("Obj_ID", [])
     arel_long = obj_ext.get("Obj_ArelLong", [])
     obj_class = obj_ext.get("Obj_Class", [])
+    ##! FOR DEBUG
+    cloudlog.debug(f"ARS408 DEBUG: obj_id={ids_ext}")
+
 
     # General：按索引写入基础字段；数组长度可能不同，使用最小长度保证安全
     n_general = min(len(ids), len(dist_long), len(dist_lat), len(vrel_long), len(vrel_lat))
