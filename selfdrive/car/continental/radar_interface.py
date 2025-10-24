@@ -108,6 +108,9 @@ class RadarInterface(RadarInterfaceBase):
     """
     if self.rcp is None:
       return super().update(None)
+    
+    if not can_strings:
+      return None
 
     vls = self.rcp.update_strings(can_strings)
     # 记录本批次原始 CAN 字符串与解析出的消息地址，便于问题定位
