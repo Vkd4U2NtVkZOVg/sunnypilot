@@ -133,8 +133,8 @@ class RadarInterface(RadarInterfaceBase):
           else:
             msgs_hex.append(str(m))
       addrs_hex = [f"0x{addr:03X}" for addr in sorted(list(vls))]
-      cloudlog.info(f"ARS408 CAN raw batch: count={len(msgs_hex)}; msgs_hex={msgs_hex}")
-      cloudlog.info(f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}")
+      _write_custom_log_line(f"ARS408 CAN raw batch: count={len(msgs_hex)}; msgs_hex={msgs_hex}")
+      _write_custom_log_line(f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}")
     except Exception:
       pass
     # `update_strings` 会重建 `vl_all` 为当前批次，并覆盖 `vl` 为最近值；
