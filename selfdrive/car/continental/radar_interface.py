@@ -8,6 +8,18 @@ from openpilot.selfdrive.car.interfaces import RadarInterfaceBase
 from selfdrive.car.continental.radar_info_tx import RadarInfoTx  # ARS408 速度/偏航率下发辅助
 from common.swaglog import cloudlog
 
+# 自定义CAN日志文件路径与文件写入辅助
+LOG_FILE_PATH = "/data/log/ars408_can.log"
+
+def _write_custom_log_line(line: str):
+  try:
+    import os
+    os.makedirs(os.path.dirname(LOG_FILE_PATH), exist_ok=True)
+    with open(LOG_FILE_PATH, 'a', encoding='utf-8') as f:
+      f.write(line + "\n")
+  except Exception:
+    pass
+
 # Continental ARS408
 DBC_NAME = "ARS408"
 RADAR_BUS = 1
@@ -117,8 +129,12 @@ class RadarInterface(RadarInterfaceBase):
           else:
             msgs_hex.append(str(m))
       addrs_hex = [f"0x{addr:03X}" for addr in sorted(list(vls))]
-      cloudlog.info(f"ARS408 CAN raw batch: count={len(msgs_hex)}; msgs_hex={msgs_hex}")
-      cloudlog.info(f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}")
+      line1 = f"ARS408 CAN raw batch: count={len(msgs_hex)}; msgs_hex={msgs_hex}"
+      line2 = f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}"
+      cloudlog.info(line1)
+      cloudlog.info(line2)
+      _write_custom_log_line(line1)
+      _write_custom_log_line(line2)
     except Exception:
       pass
     # `update_strings` 会重建 `vl_all` 为当前批次，并覆盖 `vl` 为最近值；
@@ -307,6 +323,9 @@ class RadarInterface(RadarInterfaceBase):
     except Exception:
       meas_counter = None
 
+    # 记录所有 0x60A 的 measurement counter 到自定义日志
+    if meas_counter is not None:
+      _write_custom_log_line(f"ARS408 Obj_0_Status MeasCounter={meas_counter}")
     # 诊断：判断滚动码是否相对上次有增加（考虑65536回绕），用于发现漏周期或重复帧现象（仅日志，不影响输出）。
     if meas_counter is not None:
       if self.last_meas_counter is not None:
