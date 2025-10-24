@@ -155,11 +155,6 @@ class RadarInterface(RadarInterfaceBase):
     # 同时返回本批次更新过的消息地址集合 `vls`，用于跨调用的触发判定。
     # 例如: {0x60A, 0x60B, 0x60D} => {1546, 1547, 1549}
     self.updated_messages.update(vls)
-    try:
-      addrs_hex_cum = [f"0x{addr:03X}" for addr in sorted(list(self.updated_messages))] if self.updated_messages else []
-      _write_custom_log_line(f"ARS408 updated_messages cumulative this cycle: addrs={addrs_hex_cum}")
-    except Exception:
-      pass
 
     # RadarState 为 1Hz，包含关键故障位；此处无论本周期是否更新，都读取“最近值”。
     # 若需要判断是否在本周期更新，可检查其地址（0x201=513）是否在 `updated_messages` 中。
@@ -333,6 +328,12 @@ class RadarInterface(RadarInterfaceBase):
     # 触发判定：仅在收到触发帧（Obj_0_Status / 0x60A）时输出一个周期；
     # 若尚未触发，返回 None，但缓冲继续累积对象数据，等待后续批次触发。
     ##*---------------------------触发判定开始---------------------------
+    # 日志：记录本批次 updated_messages 的地址集合
+    try:
+      _msgs_hex = ','.join([f"0x{addr:03X}" for addr in sorted(self.updated_messages)])
+      _write_custom_log_line(f"ARS408 updated_messages: [{_msgs_hex}]")
+    except Exception:
+      pass
     if self.trigger_msg not in self.updated_messages:
       return None
 
