@@ -114,6 +114,7 @@ class RadarInterface(RadarInterfaceBase):
       return None
 
     vls = self.rcp.update_strings(can_strings)
+
     # `update_strings` 会重建 `vl_all` 为当前批次，并覆盖 `vl` 为最近值；
     # 同时返回本批次更新过的消息地址集合 `vls`，用于跨调用的触发判定。
     # 例如: {0x60A, 0x60B, 0x60D} => {1546, 1547, 1549}
@@ -333,7 +334,7 @@ class RadarInterface(RadarInterfaceBase):
         self.last_meas_counter = None
         return None
       if (meas_counter - self.last_meas_counter) >= 2:
-        _write_custom_log_line(f"ARS408 Obj_0_Status MeasCounter proc={meas_counter}")
+        _write_custom_log_line(f"ARS408 Obj_0_Status MeasCounter proc={meas_counter}, ids={self.cycle_ids}")
         meas_state = None
         self.last_meas_counter = None
         try:
