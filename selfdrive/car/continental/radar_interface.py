@@ -114,7 +114,29 @@ class RadarInterface(RadarInterfaceBase):
       return None
 
     vls = self.rcp.update_strings(can_strings)
-
+    # 记录本批次原始 CAN 字符串与解析出的消息地址，便于问题定位
+    try:
+      msgs_hex = []
+      for m in can_strings:
+        if isinstance(m, (bytes, bytearray, memoryview)):
+          msgs_hex.append(" ".join(f"{b:02X}" for b in m))
+        elif isinstance(m, (list, tuple)):
+          # 可能是 (addr, data, bus) 或 [timestamp, [[addr, data, bus], ...]]
+          if len(m) == 3 and isinstance(m[1], (bytes, bytearray, memoryview)):
+            msgs_hex.append(" ".join(f"{b:02X}" for b in m[1]))
+          elif len(m) == 2 and isinstance(m[1], (list, tuple)):
+            for sub in m[1]:
+              if isinstance(sub, (list, tuple)) and len(sub) >= 2 and isinstance(sub[1], (bytes, bytearray, memoryview)):
+                msgs_hex.append(" ".join(f"{b:02X}" for b in sub[1]))
+              else:
+                msgs_hex.append(str(sub))
+          else:
+            msgs_hex.append(str(m))
+      addrs_hex = [f"0x{addr:03X}" for addr in sorted(list(vls))]
+      cloudlog.info(f"ARS408 CAN raw batch: count={len(msgs_hex)}; msgs_hex={msgs_hex}")
+      cloudlog.info(f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}")
+    except Exception:
+      pass
     # `update_strings` 会重建 `vl_all` 为当前批次，并覆盖 `vl` 为最近值；
     # 同时返回本批次更新过的消息地址集合 `vls`，用于跨调用的触发判定。
     # 例如: {0x60A, 0x60B, 0x60D} => {1546, 1547, 1549}
