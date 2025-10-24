@@ -113,28 +113,30 @@ class RadarInterface(RadarInterfaceBase):
     # 记录本批次原始 CAN 字符串与解析出的消息地址，便于问题定位
     try:
       msgs_hex = []
-      for m in can_strings:
-        if isinstance(m, (bytes, bytearray, memoryview)):
-          msgs_hex.append(" ".join(f"{b:02X}" for b in m))
-        elif isinstance(m, (list, tuple)):
-          # 可能是 (addr, data, bus) 或 [timestamp, [[addr, data, bus], ...]]
-          if len(m) == 3 and isinstance(m[1], (bytes, bytearray, memoryview)):
-            msgs_hex.append(" ".join(f"{b:02X}" for b in m[1]))
-          elif len(m) == 2 and isinstance(m[1], (list, tuple)):
-            for sub in m[1]:
-              if isinstance(sub, (list, tuple)) and len(sub) >= 2 and isinstance(sub[1], (bytes, bytearray, memoryview)):
-                msgs_hex.append(" ".join(f"{b:02X}" for b in sub[1]))
-              else:
-                msgs_hex.append(str(sub))
-          else:
-            msgs_hex.append(str(m))
-      addrs_hex = [f"0x{addr:03X}" for addr in sorted(list(vls))]
-      line1 = f"ARS408 CAN raw batch: count={len(msgs_hex)}; msgs_hex={msgs_hex}"
-      line2 = f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}"
-      cloudlog.info(line1)
-      cloudlog.info(line2)
-      _write_custom_log_line(line1)
-      _write_custom_log_line(line2)
+      if can_strings:
+        for m in can_strings:
+          if isinstance(m, (bytes, bytearray, memoryview)):
+            msgs_hex.append(" ".join(f"{b:02X}" for b in m))
+          elif isinstance(m, (list, tuple)):
+            # 可能是 (addr, data, bus) 或 [timestamp, [[addr, data, bus], ...]]
+            if len(m) == 3 and isinstance(m[1], (bytes, bytearray, memoryview)):
+              msgs_hex.append(" ".join(f"{b:02X}" for b in m[1]))
+            elif len(m) == 2 and isinstance(m[1], (list, tuple)):
+              for sub in m[1]:
+                if isinstance(sub, (list, tuple)) and len(sub) >= 2 and isinstance(sub[1], (bytes, bytearray, memoryview)):
+                  msgs_hex.append(" ".join(f"{b:02X}" for b in sub[1]))
+                else:
+                  msgs_hex.append(str(sub))
+            else:
+              msgs_hex.append(str(m))
+      addrs_hex = [f"0x{addr:03X}" for addr in sorted(list(vls))] if vls else []
+      if msgs_hex or addrs_hex:
+        line1 = f"ARS408 CAN raw batch: count={len(msgs_hex)}; msgs_hex={msgs_hex}"
+        line2 = f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}"
+        cloudlog.info(line1)
+        cloudlog.info(line2)
+        _write_custom_log_line(line1)
+        _write_custom_log_line(line2)
     except Exception:
       pass
     # `update_strings` 会重建 `vl_all` 为当前批次，并覆盖 `vl` 为最近值；
@@ -313,6 +315,7 @@ class RadarInterface(RadarInterfaceBase):
 
     # 触发判定：仅在收到触发帧（Obj_0_Status / 0x60A）时输出一个周期；
     # 若尚未触发，返回 None，但缓冲继续累积对象数据，等待后续批次触发。
+    ##*---------------------------触发判定开始---------------------------
     if self.trigger_msg not in self.updated_messages:
       return None
 
