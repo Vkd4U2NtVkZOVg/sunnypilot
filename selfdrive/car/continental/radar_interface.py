@@ -401,7 +401,15 @@ class RadarInterface(RadarInterfaceBase):
       self.pts[obj_id].yvRel = round(float(entry.get("yvRel", float('nan'))), 3)
       self.pts[obj_id].aRel = round(float(entry.get("aRel", float('nan'))), 3)
       self.pts[obj_id].measured = bool(entry.get("measured", False))
-
+      _write_custom_log_line(
+        f"ARS408 RadarPoint trackId={obj_id}; "
+        f"dRel={self.pts[obj_id].dRel:.3f}; "
+        f"yRel={self.pts[obj_id].yRel:.3f}; "
+        f"vRel={self.pts[obj_id].vRel:.3f}; "
+        f"yvRel={self.pts[obj_id].yvRel:.3f}; "
+        f"aRel={self.pts[obj_id].aRel:.3f}; "
+        f"measured={self.pts[obj_id].measured}"
+      )
     # 剪枝：删除未通过门控的旧轨迹，避免幽灵目标残留
     for old_id in list(self.pts.keys()):
       if old_id not in gated_ids:
