@@ -146,11 +146,9 @@ class RadarInterface(RadarInterfaceBase):
       addrs_hex = [f"0x{addr:03X}" for addr in sorted(list(vls))] if vls else []
       if msgs_addr_hex or addrs_hex:
         line1 = f"ARS408 CAN batch (addr→hex): count={len(msgs_addr_hex)}; addr_hex={msgs_addr_hex}"
-        line2 = f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}"
-        cloudlog.info(line1)
-        cloudlog.info(line2)
+        #line2 = f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}"
+        #cloudlog.info(line1)
         _write_custom_log_line(line1)
-        _write_custom_log_line(line2)
     except Exception:
       pass
     # `update_strings` 会重建 `vl_all` 为当前批次，并覆盖 `vl` 为最近值；
@@ -418,15 +416,15 @@ class RadarInterface(RadarInterfaceBase):
       self.pts[obj_id].yvRel = round(float(entry.get("yvRel", float('nan'))), 3)
       self.pts[obj_id].aRel = round(float(entry.get("aRel", float('nan'))), 3)
       self.pts[obj_id].measured = bool(entry.get("measured", False))
-      _write_custom_log_line(
-        f"ARS408 RadarPoint trackId={obj_id}; "
-        f"dRel={self.pts[obj_id].dRel:.3f}; "
-        f"yRel={self.pts[obj_id].yRel:.3f}; "
-        f"vRel={self.pts[obj_id].vRel:.3f}; "
-        f"yvRel={self.pts[obj_id].yvRel:.3f}; "
-        f"aRel={self.pts[obj_id].aRel:.3f}; "
-        f"measured={self.pts[obj_id].measured}"
-      )
+      # _write_custom_log_line(
+      #   f"ARS408 RadarPoint trackId={obj_id}; "
+      #   f"dRel={self.pts[obj_id].dRel:.3f}; "
+      #   f"yRel={self.pts[obj_id].yRel:.3f}; "
+      #   f"vRel={self.pts[obj_id].vRel:.3f}; "
+      #   f"yvRel={self.pts[obj_id].yvRel:.3f}; "
+      #   f"aRel={self.pts[obj_id].aRel:.3f}; "
+      #   f"measured={self.pts[obj_id].measured}"
+      # )
     # 剪枝：删除未通过门控的旧轨迹，避免幽灵目标残留
     for old_id in list(self.pts.keys()):
       if old_id not in gated_ids:
