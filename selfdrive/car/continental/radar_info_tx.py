@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from cereal import car
 from opendbc.can.packer import CANPacker
@@ -30,7 +30,7 @@ class RadarInfoTx:
     self.bus = bus
     self.packer = CANPacker(DBC_NAME)
 
-  def make(self, speed_mps: float, yaw_rate_radps: float, shiftgear: car.CarState.GearShifter | None = None, direction_override: int | None = None) -> List[Tuple[int, bytes, int]]:
+  def make(self, speed_mps: float, yaw_rate_radps: float, shiftgear: Optional[car.CarState.GearShifter] = None, direction_override: Optional[int] = None) -> List[Tuple[int, bytes, int]]:
     # 方向枚举: 0=静止, 1=前进, 2=倒车
     if direction_override is not None:
       direction = direction_override
