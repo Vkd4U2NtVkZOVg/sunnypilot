@@ -115,26 +115,37 @@ class RadarInterface(RadarInterfaceBase):
     vls = self.rcp.update_strings(can_strings)
     # 记录本批次原始 CAN 字符串与解析出的消息地址，便于问题定位
     try:
-      msgs_hex = []
+      msgs_addr_hex = []
       if can_strings:
         for m in can_strings:
-          if isinstance(m, (bytes, bytearray, memoryview)):
-            msgs_hex.append(" ".join(f"{b:02X}" for b in m))
-          elif isinstance(m, (list, tuple)):
-            # 可能是 (addr, data, bus) 或 [timestamp, [[addr, data, bus], ...]]
-            if len(m) == 3 and isinstance(m[1], (bytes, bytearray, memoryview)):
-              msgs_hex.append(" ".join(f"{b:02X}" for b in m[1]))
+          if isinstance(m, (list, tuple)):
+            # 形态1: (addr, data, bus)
+            if len(m) == 3 and isinstance(m[0], int) and isinstance(m[1], (bytes, bytearray, memoryview)):
+              addr = m[0]
+              data = m[1]
+              hexs = " ".join(f"{b:02X}" for b in data)
+              msgs_addr_hex.append(f"0x{addr:03X}: {hexs}")
+            # 形态2: [timestamp, [[addr, data, bus], ...]]
             elif len(m) == 2 and isinstance(m[1], (list, tuple)):
               for sub in m[1]:
-                if isinstance(sub, (list, tuple)) and len(sub) >= 2 and isinstance(sub[1], (bytes, bytearray, memoryview)):
-                  msgs_hex.append(" ".join(f"{b:02X}" for b in sub[1]))
+                if isinstance(sub, (list, tuple)) and len(sub) >= 2 and isinstance(sub[0], int) and isinstance(sub[1], (bytes, bytearray, memoryview)):
+                  addr = sub[0]
+                  data = sub[1]
+                  hexs = " ".join(f"{b:02X}" for b in data)
+                  msgs_addr_hex.append(f"0x{addr:03X}: {hexs}")
                 else:
-                  msgs_hex.append(str(sub))
+                  msgs_addr_hex.append(str(sub))
             else:
-              msgs_hex.append(str(m))
+              msgs_addr_hex.append(str(m))
+          elif isinstance(m, (bytes, bytearray, memoryview)):
+            # 无地址信息的裸数据，标记为 UNK
+            hexs = " ".join(f"{b:02X}" for b in m)
+            msgs_addr_hex.append(f"UNK: {hexs}")
+          else:
+            msgs_addr_hex.append(str(m))
       addrs_hex = [f"0x{addr:03X}" for addr in sorted(list(vls))] if vls else []
-      if msgs_hex or addrs_hex:
-        line1 = f"ARS408 CAN raw batch: count={len(msgs_hex)}; msgs_hex={msgs_hex}"
+      if msgs_addr_hex or addrs_hex:
+        line1 = f"ARS408 CAN batch (addr→hex): count={len(msgs_addr_hex)}; addr_hex={msgs_addr_hex}"
         line2 = f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}"
         cloudlog.info(line1)
         cloudlog.info(line2)
