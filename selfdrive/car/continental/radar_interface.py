@@ -432,7 +432,7 @@ class RadarInterface(RadarInterfaceBase):
               continue
           except Exception:
             continue
-          _write_custom_log_line("-----------------------------------------------------------------")
+          cloudlog.info("-----------------------------------------------------------------")
           gated_ids.add(obj_id)
           if obj_id not in self.pts:
             self.pts[obj_id] = car.RadarData.RadarPoint.new_message()
