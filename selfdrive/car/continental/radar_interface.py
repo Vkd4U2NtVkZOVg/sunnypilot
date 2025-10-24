@@ -332,7 +332,8 @@ class RadarInterface(RadarInterfaceBase):
         counter_delta = (meas_counter - self.last_meas_counter) & 0xFFFF
         if counter_delta == 0:
           cloudlog.warning(f"ARS408 Obj_MeasCounter did not increment: prev={self.last_meas_counter}, curr={meas_counter}")
-        elif counter_delta > 1:
+        #ARS408 Obj_MeasCounter跳变超过2，可能表示丢帧或重复帧, 大陆雷达自增单位原本就是2
+        elif counter_delta > 2:
           cloudlog.info(f"ARS408 Obj_MeasCounter jumped by {counter_delta} (missed cycles?): prev={self.last_meas_counter}, curr={meas_counter}")
       self.last_meas_counter = meas_counter
 
