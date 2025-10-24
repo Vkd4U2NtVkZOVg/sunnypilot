@@ -104,9 +104,9 @@ class RadarInterface(RadarInterfaceBase):
       for m in can_strings:
         if isinstance(m, (bytes, bytearray, memoryview)):
           msgs_hex.append(m.hex().upper())
-      else:
-        # 已是字符串或其他类型时，直接记录其字符串表示，避免抛异常
-        msgs_hex.append(str(m))
+        else:
+          # 已是字符串或其他类型时，直接记录其字符串表示，避免抛异常
+          msgs_hex.append(str(m))
       addrs_hex = [f"0x{addr:03X}" for addr in sorted(list(vls))]
       cloudlog.info(f"ARS408 CAN raw batch: count={len(can_strings)}; msgs_hex={msgs_hex}")
       cloudlog.info(f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}")
@@ -187,9 +187,22 @@ class RadarInterface(RadarInterfaceBase):
     arel_long = obj_ext.get("Obj_ArelLong", [])
     obj_class = obj_ext.get("Obj_Class", [])
 
+    # 辅助：将浮点数组统一格式化为三位小数的字符串，避免日志小数位过长
+    def _fmt3_list(arr):
+      out = []
+      for x in arr:
+        try:
+          if isinstance(x, (int, float)):
+            out.append(f"{float(x):.3f}")
+          else:
+            out.append(str(x))
+        except Exception:
+          out.append(str(x))
+      return out
+
     # 记录原始解析数组到日志，便于离线比对与调试（可能较为冗长）
-    cloudlog.info(f"ARS408 Obj_1_General raw: count={len(ids)}; ids={list(ids)}; dist_long={list(dist_long)}; dist_lat={list(dist_lat)}; vrel_long={list(vrel_long)}; vrel_lat={list(vrel_lat)}")
-    cloudlog.info(f"ARS408 Obj_3_Extended raw: count={len(ids_ext)}; ids={list(ids_ext)}; arel_long={list(arel_long)}; obj_class={list(obj_class)}")
+    cloudlog.info(f"ARS408 Obj_1_General raw: count={len(ids)}; ids={list(ids)}; dist_long={_fmt3_list(dist_long)}; dist_lat={_fmt3_list(dist_lat)}; vrel_long={_fmt3_list(vrel_long)}; vrel_lat={_fmt3_list(vrel_lat)}")
+    cloudlog.info(f"ARS408 Obj_3_Extended raw: count={len(ids_ext)}; ids={list(ids_ext)}; arel_long={_fmt3_list(arel_long)}; obj_class={list(obj_class)}")
 
 
     # General：按索引写入基础字段；数组长度可能不同，使用最小长度保证安全
@@ -201,10 +214,10 @@ class RadarInterface(RadarInterfaceBase):
         entry = {}
         self.cycle_objs[obj_id] = entry
       # 基础几何/速度字段（单位：m / m/s）
-      entry["dRel"] = float(dist_long[i])
-      entry["yRel"] = float(dist_lat[i])
-      entry["vRel"] = float(vrel_long[i])
-      entry["yvRel"] = float(vrel_lat[i])
+      entry["dRel"] = round(float(dist_long[i]), 3)
+      entry["yRel"] = round(float(dist_lat[i]), 3)
+      entry["vRel"] = round(float(vrel_long[i]), 3)
+      entry["yvRel"] = round(float(vrel_lat[i]), 3)
       entry["measured"] = True
       self.cycle_ids.add(obj_id)
 
@@ -218,7 +231,7 @@ class RadarInterface(RadarInterfaceBase):
         self.cycle_objs[obj_id_ext] = entry
       # ArelLong 单位 m/s^2；若缺失保留为空以便后续用 NaN 填充
       if j < len(arel_long):
-        entry["aRel"] = float(arel_long[j])
+        entry["aRel"] = round(float(arel_long[j]), 3)
       # Obj_Class 为枚举；解析失败时忽略，不影响其他字段
       if j < len(obj_class):
         try:
@@ -353,11 +366,11 @@ class RadarInterface(RadarInterfaceBase):
       # 轨迹字段单位说明：
       # - dRel/yRel: m；vRel/yvRel: m/s；aRel: m/s^2
       # 缺失字段使用 NaN，以区分“未测量”与有效零值
-      self.pts[obj_id].dRel = float(entry.get("dRel", float('nan')))
-      self.pts[obj_id].yRel = float(entry.get("yRel", float('nan')))
-      self.pts[obj_id].vRel = float(entry.get("vRel", float('nan')))
-      self.pts[obj_id].yvRel = float(entry.get("yvRel", float('nan')))
-      self.pts[obj_id].aRel = float(entry.get("aRel", float('nan')))
+      self.pts[obj_id].dRel = round(float(entry.get("dRel", float('nan'))), 3)
+      self.pts[obj_id].yRel = round(float(entry.get("yRel", float('nan'))), 3)
+      self.pts[obj_id].vRel = round(float(entry.get("vRel", float('nan'))), 3)
+      self.pts[obj_id].yvRel = round(float(entry.get("yvRel", float('nan'))), 3)
+      self.pts[obj_id].aRel = round(float(entry.get("aRel", float('nan'))), 3)
       self.pts[obj_id].measured = bool(entry.get("measured", False))
 
     # 剪枝：删除未通过门控的旧轨迹，避免幽灵目标残留
