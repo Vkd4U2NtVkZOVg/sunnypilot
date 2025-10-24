@@ -98,6 +98,12 @@ class RadarInterface(RadarInterfaceBase):
       return super().update(None)
 
     vls = self.rcp.update_strings(can_strings)
+    # 记录本批次原始 CAN 字符串与解析出的消息地址，便于问题定位
+    try:
+      cloudlog.info(f"ARS408 CAN raw batch: count={len(can_strings)}; msgs={list(can_strings)}")
+      cloudlog.info(f"ARS408 CAN parsed addrs this batch: addrs={sorted(list(vls))}")
+    except Exception:
+      pass
     # `update_strings` 会重建 `vl_all` 为当前批次，并覆盖 `vl` 为最近值；
     # 同时返回本批次更新过的消息地址集合 `vls`，用于跨调用的触发判定。
     # 例如: {0x60A, 0x60B, 0x60D} => {1546, 1547, 1549}
