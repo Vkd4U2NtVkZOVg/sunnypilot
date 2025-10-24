@@ -352,15 +352,15 @@ class RadarInterface(RadarInterfaceBase):
     # if meas_counter is not None:
     #   _write_custom_log_line(f"ARS408 Obj_0_Status MeasCounter={meas_counter}")
     # 诊断：判断滚动码是否相对上次有增加（考虑65536回绕），用于发现漏周期或重复帧现象（仅日志，不影响输出）。
-    if meas_counter is not None:
-      if self.last_meas_counter is not None:
-        counter_delta = (meas_counter - self.last_meas_counter) & 0xFFFF
-        if counter_delta == 0:
-          cloudlog.warning(f"ARS408 Obj_MeasCounter did not increment: prev={self.last_meas_counter}, curr={meas_counter}")
-        #ARS408 Obj_MeasCounter跳变超过2，可能表示丢帧或重复帧, 大陆雷达自增单位原本就是2
-        elif counter_delta > 2:
-          cloudlog.info(f"ARS408 Obj_MeasCounter jumped by {counter_delta} (missed cycles?): prev={self.last_meas_counter}, curr={meas_counter}")
-      self.last_meas_counter = meas_counter
+    # if meas_counter is not None:
+    #   if self.last_meas_counter is not None:
+    #     counter_delta = (meas_counter - self.last_meas_counter) & 0xFFFF
+    #     if counter_delta == 0:
+    #       cloudlog.warning(f"ARS408 Obj_MeasCounter did not increment: prev={self.last_meas_counter}, curr={meas_counter}")
+    #     #ARS408 Obj_MeasCounter跳变超过2，可能表示丢帧或重复帧, 大陆雷达自增单位原本就是2
+    #     elif counter_delta > 2:
+    #       cloudlog.info(f"ARS408 Obj_MeasCounter jumped by {counter_delta} (missed cycles?): prev={self.last_meas_counter}, curr={meas_counter}")
+    #   self.last_meas_counter = meas_counter
 
     #第一次进入, 还未初始化last_meas_counter
     if self.last_meas_counter is None:
