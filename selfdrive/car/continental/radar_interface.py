@@ -104,11 +104,20 @@ class RadarInterface(RadarInterfaceBase):
       for m in can_strings:
         if isinstance(m, (bytes, bytearray, memoryview)):
           msgs_hex.append(" ".join(f"{b:02X}" for b in m))
-        else:
-          # 已是字符串或其他类型时，直接记录其字符串表示，避免抛异常
-          msgs_hex.append(str(m))
+        elif isinstance(m, (list, tuple)):
+          # 可能是 (addr, data, bus) 或 [timestamp, [[addr, data, bus], ...]]
+          if len(m) == 3 and isinstance(m[1], (bytes, bytearray, memoryview)):
+            msgs_hex.append(" ".join(f"{b:02X}" for b in m[1]))
+          elif len(m) == 2 and isinstance(m[1], (list, tuple)):
+            for sub in m[1]:
+              if isinstance(sub, (list, tuple)) and len(sub) >= 2 and isinstance(sub[1], (bytes, bytearray, memoryview)):
+                msgs_hex.append(" ".join(f"{b:02X}" for b in sub[1]))
+              else:
+                msgs_hex.append(str(sub))
+          else:
+            msgs_hex.append(str(m))
       addrs_hex = [f"0x{addr:03X}" for addr in sorted(list(vls))]
-      cloudlog.info(f"ARS408 CAN raw batch: count={len(can_strings)}; msgs_hex={msgs_hex}")
+      cloudlog.info(f"ARS408 CAN raw batch: count={len(msgs_hex)}; msgs_hex={msgs_hex}")
       cloudlog.info(f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}")
     except Exception:
       pass
