@@ -341,7 +341,7 @@ class RadarInterface(RadarInterfaceBase):
       return None
 
     # 从 Obj_0_Status 读取滚动计数与对象数（诊断用途），周期边界以触发帧到达为准。
-    _write_custom_log_line("--------------------------------------------decoding---------------")
+    
     obj_status = self.rcp.vl.get("Obj_0_Status", {})
     try:
       meas_counter = int(obj_status.get("Obj_MeasCounter"))
@@ -381,6 +381,7 @@ class RadarInterface(RadarInterfaceBase):
         self.last_meas_counter = None
         return None
       if (meas_counter - self.last_meas_counter) >= 2:
+        _write_custom_log_line("--------------------------------------------decoding------------------------")
         meas_state = None
         self.last_meas_counter = None
         try:
