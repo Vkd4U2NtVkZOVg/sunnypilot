@@ -181,18 +181,128 @@ class RadarInterface(RadarInterfaceBase):
       self.cycle_ids.clear()
       return ret
     elif len(faults_now) == 0 and len(self.last_faults_active) > 0:
-      # 故障从有到无，记录日志并恢复正常；不强制输出一帧。
       cloudlog.info("ARS408 RadarState faults cleared")
       self.last_faults_active = set()
 
-    # 跨调用缓冲：把当前批次的对象帧追加进 `self.cycle_objs`/`self.cycle_ids`。
-    # - General(0x60B) 按索引写入基础字段（dRel/yRel/vRel/yvRel），索引由同批次的数组对齐。
-    # - Extended(0x60D) 按 Obj_ID 显式对齐补充 aRel，允许跨批次到达。
-    # 缓冲不依赖 `updated_messages`，每次调用都会尝试追加。
-    #TODO: 需要解析60C和60D以增强目标判断的可靠性
-    #TODO: 60C中需要判断目标存在的可能性
-    #TODO: 60D中需要判断目标类型
-    #TODO: 还需要解析60E中碰撞的相关信息以提醒Driver
+    # 触发优先：若本批次含 0x60A，先依据 MeasCounter 结算上一周期，清空缓冲设基线；随后继续解析本批次对象帧为新周期起点
+    ret_prev = None
+    finalized_prev_cycle = False
+    if TRIGGER_MSG_ADDR in vls:
+      obj_status_curr = self.rcp.vl.get("Obj_0_Status", {})
+      try:
+        meas_counter_curr = int(obj_status_curr.get("Obj_MeasCounter"))
+      except Exception:
+        meas_counter_curr = None
+
+      if self.last_meas_counter is None:
+        # 首次看到 0x60A：建立基线并清空旧缓冲，当前批次对象将作为新周期起点
+        if meas_counter_curr is not None:
+          _write_custom_log_line(f"ARS408 trigger-first init MeasCounter={meas_counter_curr}")
+          self.cycle_objs.clear()
+          self.cycle_ids.clear()
+          self.updated_messages.clear()
+          self.last_meas_counter = meas_counter_curr
+        # 继续往下解析对象帧，不返回
+      else:
+        if meas_counter_curr is None:
+          # 异常：当前 0x60A 无计数，重置状态避免污染
+          _write_custom_log_line("ARS408 trigger-first: Obj_0_Status MeasCounter missing, resetting buffers")
+          self.updated_messages.clear()
+          self.cycle_objs.clear()
+          self.cycle_ids.clear()
+          self.last_meas_counter = None
+          return None
+
+        counter_delta = (meas_counter_curr - self.last_meas_counter) & 0xFFFF
+        # 大陆雷达计数步进为 2；当计数发生变化，先结算上一周期
+        if counter_delta >= 2:
+          _write_custom_log_line(f"ARS408 trigger-first rollover: prev={self.last_meas_counter}, curr={meas_counter_curr}, ids={self.cycle_ids}")
+          # 周期完整性日志（上一周期）
+          try:
+            nof_objects_prev = int(self.rcp.vl.get("Obj_0_Status", {}).get("Obj_NofObjects"))
+          except Exception:
+            nof_objects_prev = None
+          if nof_objects_prev is not None:
+            num_ids_prev = len(self.cycle_ids)
+            if num_ids_prev < nof_objects_prev:
+              _write_custom_log_line(f"ARS408 cycle completeness(prev): expected={nof_objects_prev}, seen={num_ids_prev}, missing={nof_objects_prev - num_ids_prev}, meas_counter={self.last_meas_counter}")
+            elif num_ids_prev > nof_objects_prev:
+              _write_custom_log_line(f"ARS408 cycle over-complete(prev): expected={nof_objects_prev}, seen={num_ids_prev}, extra={num_ids_prev - nof_objects_prev}, meas_counter={self.last_meas_counter}")
+            else:
+              _write_custom_log_line(f"ARS408 cycle complete(prev): expected={nof_objects_prev}, seen={num_ids_prev}, meas_counter={self.last_meas_counter}")
+
+          # 构造返回与错误列表（上一周期）
+          ret_prev = car.RadarData.new_message()
+          errors = []
+          if len(faults_now) > 0:
+            errors.extend(sorted(list(faults_now)))
+          if not self.rcp.can_valid:
+            errors.append("canError")
+          try:
+            if radar_state.get("RadarState_Interference") or radar_state.get("RadarState_Voltage_Error"):
+              if "interference" not in errors and int(radar_state.get("RadarState_Interference", 0)):
+                errors.append("interference")
+              if "voltageError" not in errors and int(radar_state.get("RadarState_Voltage_Error", 0)):
+                errors.append("voltageError")
+          except Exception:
+            pass
+
+          # 门控与点云组装（针对上一周期的缓冲）
+          current_ids_prev = set(self.cycle_ids)
+          gated_ids_prev = set()
+          for obj_id in current_ids_prev:
+            entry = self.cycle_objs.get(obj_id, {})
+            cls_val = entry.get("objClass")
+            prob_val = entry.get("probExist")
+            if cls_val is not None:
+              try:
+                if int(cls_val) == 0:
+                  _write_custom_log_line(f"ARS408 gated point target(prev): obj_id={obj_id}, cls_val={cls_val}")
+                  continue
+              except Exception:
+                pass
+            try:
+              if prob_val is None or int(prob_val) <= 1:
+                _write_custom_log_line(f"ARS408 gated low probability(prev): obj_id={obj_id}, prob_val={prob_val}")
+                continue
+            except Exception:
+              continue
+            gated_ids_prev.add(obj_id)
+            if obj_id not in self.pts:
+              self.pts[obj_id] = car.RadarData.RadarPoint.new_message()
+              self.pts[obj_id].trackId = obj_id
+            self.pts[obj_id].dRel = round(float(entry.get("dRel", float('nan'))), 3)
+            self.pts[obj_id].yRel = round(float(entry.get("yRel", float('nan'))), 3)
+            self.pts[obj_id].vRel = round(float(entry.get("vRel", float('nan'))), 3)
+            self.pts[obj_id].yvRel = round(float(entry.get("yvRel", float('nan'))), 3)
+            self.pts[obj_id].aRel = round(float(entry.get("aRel", float('nan'))), 3)
+            self.pts[obj_id].measured = bool(entry.get("measured", False))
+            _write_custom_log_line(
+              f"ARS408 RadarPoint(prev) trackId={obj_id}; "
+              f"dRel={self.pts[obj_id].dRel:.3f}; "
+              f"yRel={self.pts[obj_id].yRel:.3f}; "
+              f"vRel={self.pts[obj_id].vRel:.3f}; "
+              f"yvRel={self.pts[obj_id].yvRel:.3f}; "
+              f"aRel={self.pts[obj_id].aRel:.3f}; "
+              f"measured={self.pts[obj_id].measured}; "
+              f"hasExt={entry.get('hasExt', False)}"
+            )
+          for old_id in list(self.pts.keys()):
+            if old_id not in gated_ids_prev:
+              del self.pts[old_id]
+
+          ret_prev.errors = errors
+          ret_prev.points = list(self.pts.values())
+
+          # 清理上一周期缓冲，并以当前计数作为新周期基线
+          self.updated_messages.clear()
+          self.cycle_objs.clear()
+          self.cycle_ids.clear()
+          self.last_meas_counter = meas_counter_curr
+
+          # 标记已结算上一周期；继续解析本批次对象作为新周期起点
+          finalized_prev_cycle = True
+
     # ... Object_1_General：索引对齐的基础几何/速度（单位遵循规格）
     # - Obj_DistLong/Obj_DistLat: m（雷达坐标系：前为+，左为+）
     # - Obj_VrelLong/Obj_VrelLat: m/s（相对速度；前向为+，左向为+）
