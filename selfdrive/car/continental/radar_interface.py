@@ -344,11 +344,11 @@ class RadarInterface(RadarInterfaceBase):
         if nof_objects is not None:
           num_ids = len(self.cycle_ids)
           if num_ids < nof_objects:
-            cloudlog.info(f"ARS408 cycle completeness: expected={nof_objects}, seen={num_ids}, missing={nof_objects - num_ids}, meas_counter={meas_counter}")
+            _write_custom_log_line(f"ARS408 cycle completeness: expected={nof_objects}, seen={num_ids}, missing={nof_objects - num_ids}, meas_counter={meas_counter}")
           elif num_ids > nof_objects:
-            cloudlog.info(f"ARS408 cycle over-complete: expected={nof_objects}, seen={num_ids}, extra={num_ids - nof_objects}, meas_counter={meas_counter}")
+            _write_custom_log_line(f"ARS408 cycle over-complete: expected={nof_objects}, seen={num_ids}, extra={num_ids - nof_objects}, meas_counter={meas_counter}")
           else:
-            cloudlog.debug(f"ARS408 cycle complete: expected={nof_objects}, seen={num_ids}, meas_counter={meas_counter}")
+            _write_custom_log_line(f"ARS408 cycle complete: expected={nof_objects}, seen={num_ids}, meas_counter={meas_counter}")
         # 初始化返回对象与错误列表（包含 RadarState 的故障位与 CAN 有效性）
         ret = car.RadarData.new_message()
         errors = []
@@ -377,11 +377,13 @@ class RadarInterface(RadarInterfaceBase):
           if cls_val is not None:
             try:
               if int(cls_val) == 0:
+                _write_custom_log_line(f"ARS408 gated point target: obj_id={obj_id}, cls_val={cls_val}")
                 continue
             except Exception:
               pass
           try:
             if prob_val is None or int(prob_val) <= 1:
+              _write_custom_log_line(f"ARS408 gated low probability: obj_id={obj_id}, prob_val={prob_val}")
               continue
           except Exception:
             continue
