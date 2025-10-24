@@ -381,7 +381,7 @@ class RadarInterface(RadarInterfaceBase):
         self.last_meas_counter = None
         return None
       if (meas_counter - self.last_meas_counter) >= 2:
-        _write_custom_log_line("--------------------------------------------decoding------------------------")
+        _write_custom_log_line(f"ARS408 Obj_0_Status MeasCounter proc={meas_counter}")
         meas_state = None
         self.last_meas_counter = None
         try:
@@ -432,7 +432,7 @@ class RadarInterface(RadarInterfaceBase):
               continue
           except Exception:
             continue
-          
+          _write_custom_log_line("-----------------------------------------------------------------")
           gated_ids.add(obj_id)
           if obj_id not in self.pts:
             self.pts[obj_id] = car.RadarData.RadarPoint.new_message()
