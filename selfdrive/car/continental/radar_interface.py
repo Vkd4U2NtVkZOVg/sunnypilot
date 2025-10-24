@@ -172,8 +172,10 @@ class RadarInterface(RadarInterfaceBase):
     ids_ext = obj_ext.get("Obj_ID", [])
     arel_long = obj_ext.get("Obj_ArelLong", [])
     obj_class = obj_ext.get("Obj_Class", [])
-    ##! FOR DEBUG
-    cloudlog.debug(f"ARS408 DEBUG: obj_id={ids_ext}")
+
+    # 记录原始解析数组到日志，便于离线比对与调试（可能较为冗长）
+    cloudlog.info(f"ARS408 Obj_1_General raw: count={len(ids)}; ids={list(ids)}; dist_long={list(dist_long)}; dist_lat={list(dist_lat)}; vrel_long={list(vrel_long)}; vrel_lat={list(vrel_lat)}")
+    cloudlog.info(f"ARS408 Obj_3_Extended raw: count={len(ids_ext)}; ids={list(ids_ext)}; arel_long={list(arel_long)}; obj_class={list(obj_class)}")
 
 
     # General：按索引写入基础字段；数组长度可能不同，使用最小长度保证安全
