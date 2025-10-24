@@ -24,7 +24,7 @@ def _create_radar_can_parser():
     ("Obj_1_General", 14),
     ("Obj_2_Quality", 14),
     ("Obj_3_Extended", 14),
-    ("Obj_4_Warning", 14),
+    #("Obj_4_Warning", 14),
     ("RadarState", 1),  # Spec: 1 Hz (0x201)
   ]
 
@@ -237,22 +237,22 @@ class RadarInterface(RadarInterfaceBase):
 
     # 0x60E Object_4_Warning：碰撞检测区域位图（bitfield）；具体位义由雷达端定义
     # 这里只做透传以便上层根据需求进行提示或进一步筛选
-    obj_warn = self.rcp.vl_all.get("Obj_4_Warning", {})
-    ids_warn = obj_warn.get("Obj_ID", [])
-    warn_bits = obj_warn.get("Obj_CollDetRegionBitfield", [])
-    n_warn = min(len(ids_warn), len(warn_bits))
-    for w in range(n_warn):
-      oid_w = int(ids_warn[w])
-      entry_w = self.cycle_objs.get(oid_w)
-      if entry_w is None:
-        entry_w = {}
-        self.cycle_objs[oid_w] = entry_w
-      try:
-        entry_w["collDetRegionBits"] = int(warn_bits[w])
-      except Exception:
-        pass
-      entry_w["measured"] = True
-      self.cycle_ids.add(oid_w)
+    # obj_warn = self.rcp.vl_all.get("Obj_4_Warning", {})
+    # ids_warn = obj_warn.get("Obj_ID", [])
+    # warn_bits = obj_warn.get("Obj_CollDetRegionBitfield", [])
+    # n_warn = min(len(ids_warn), len(warn_bits))
+    # for w in range(n_warn):
+    #   oid_w = int(ids_warn[w])
+    #   entry_w = self.cycle_objs.get(oid_w)
+    #   if entry_w is None:
+    #     entry_w = {}
+    #     self.cycle_objs[oid_w] = entry_w
+    #   try:
+    #     entry_w["collDetRegionBits"] = int(warn_bits[w])
+    #   except Exception:
+    #     pass
+    #   entry_w["measured"] = True
+    #   self.cycle_ids.add(oid_w)
 
     # 触发判定：仅在收到触发帧（Obj_0_Status / 0x60A）时输出一个周期；
     # 若尚未触发，返回 None，但缓冲继续累积对象数据，等待后续批次触发。
