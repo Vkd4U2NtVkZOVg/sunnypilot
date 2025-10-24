@@ -155,6 +155,11 @@ class RadarInterface(RadarInterfaceBase):
     # 同时返回本批次更新过的消息地址集合 `vls`，用于跨调用的触发判定。
     # 例如: {0x60A, 0x60B, 0x60D} => {1546, 1547, 1549}
     self.updated_messages.update(vls)
+    try:
+      addrs_hex_cum = [f"0x{addr:03X}" for addr in sorted(list(self.updated_messages))] if self.updated_messages else []
+      _write_custom_log_line(f"ARS408 updated_messages cumulative this cycle: addrs={addrs_hex_cum}")
+    except Exception:
+      pass
 
     # RadarState 为 1Hz，包含关键故障位；此处无论本周期是否更新，都读取“最近值”。
     # 若需要判断是否在本周期更新，可检查其地址（0x201=513）是否在 `updated_messages` 中。
@@ -339,8 +344,8 @@ class RadarInterface(RadarInterfaceBase):
       meas_counter = None
 
     # 记录所有 0x60A 的 measurement counter 到自定义日志
-    if meas_counter is not None:
-      _write_custom_log_line(f"ARS408 Obj_0_Status MeasCounter={meas_counter}")
+    # if meas_counter is not None:
+    #   _write_custom_log_line(f"ARS408 Obj_0_Status MeasCounter={meas_counter}")
     # 诊断：判断滚动码是否相对上次有增加（考虑65536回绕），用于发现漏周期或重复帧现象（仅日志，不影响输出）。
     if meas_counter is not None:
       if self.last_meas_counter is not None:
