@@ -100,8 +100,16 @@ class RadarInterface(RadarInterfaceBase):
     vls = self.rcp.update_strings(can_strings)
     # 记录本批次原始 CAN 字符串与解析出的消息地址，便于问题定位
     try:
-      cloudlog.info(f"ARS408 CAN raw batch: count={len(can_strings)}; msgs={list(can_strings)}")
-      cloudlog.info(f"ARS408 CAN parsed addrs this batch: addrs={sorted(list(vls))}")
+      msgs_hex = []
+      for m in can_strings:
+        if isinstance(m, (bytes, bytearray, memoryview)):
+          msgs_hex.append(m.hex().upper())
+      else:
+        # 已是字符串或其他类型时，直接记录其字符串表示，避免抛异常
+        msgs_hex.append(str(m))
+      addrs_hex = [f"0x{addr:03X}" for addr in sorted(list(vls))]
+      cloudlog.info(f"ARS408 CAN raw batch: count={len(can_strings)}; msgs_hex={msgs_hex}")
+      cloudlog.info(f"ARS408 CAN parsed addrs this batch: addrs={addrs_hex}")
     except Exception:
       pass
     # `update_strings` 会重建 `vl_all` 为当前批次，并覆盖 `vl` 为最近值；
