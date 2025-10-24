@@ -1,5 +1,6 @@
 ﻿#!/usr/bin/env python3
 from math import isnan
+from tkinter import S
 from typing import Set
 
 from cereal import car
@@ -334,6 +335,8 @@ class RadarInterface(RadarInterfaceBase):
       _write_custom_log_line(f"ARS408 updated_messages: [{_msgs_hex}]")
     except Exception:
       pass
+    # 触发判定：仅在收到触发帧（Obj_0_Status / 0x60A）时输出一个周期；
+    # 若尚未触发，返回 None，但缓冲继续累积对象数据，等待后续批次触发。
     if self.trigger_msg not in self.updated_messages:
       return None
 
@@ -359,92 +362,111 @@ class RadarInterface(RadarInterfaceBase):
           cloudlog.info(f"ARS408 Obj_MeasCounter jumped by {counter_delta} (missed cycles?): prev={self.last_meas_counter}, curr={meas_counter}")
       self.last_meas_counter = meas_counter
 
-    # 周期完整性日志：对比 Obj_NofObjects 与缓冲中对象数（仅提示）。
-    try:
-      nof_objects = int(obj_status.get("Obj_NofObjects"))
-    except Exception:
-      nof_objects = None
-    if nof_objects is not None:
-      num_ids = len(self.cycle_ids)
-      if num_ids < nof_objects:
-        cloudlog.info(f"ARS408 cycle completeness: expected={nof_objects}, seen={num_ids}, missing={nof_objects - num_ids}, meas_counter={meas_counter}")
-      elif num_ids > nof_objects:
-        cloudlog.info(f"ARS408 cycle over-complete: expected={nof_objects}, seen={num_ids}, extra={num_ids - nof_objects}, meas_counter={meas_counter}")
-      else:
-        cloudlog.debug(f"ARS408 cycle complete: expected={nof_objects}, seen={num_ids}, meas_counter={meas_counter}")
-
-    # 初始化返回对象与错误列表（包含 RadarState 的故障位与 CAN 有效性）
-    ret = car.RadarData.new_message()
-    errors = []
-    if len(faults_now) > 0:
-      errors.extend(sorted(list(faults_now)))
-    if not self.rcp.can_valid:
-      errors.append("canError")
-    try:
-      if radar_state.get("RadarState_Interference") or radar_state.get("RadarState_Voltage_Error"):
-        if "interference" not in errors and int(radar_state.get("RadarState_Interference", 0)):
-          errors.append("interference")
-        if "voltageError" not in errors and int(radar_state.get("RadarState_Voltage_Error", 0)):
-          errors.append("voltageError")
-    except Exception:
-      pass
-
-    # 门控：
-    # - 忽略点目标（Obj_Class == 0）
-    # - 需要存在概率 >25%（ProbOfExist > 1）；不足则丢弃以降低噪声
-    current_ids = set(self.cycle_ids)
-    gated_ids = set()
-    for obj_id in current_ids:
-      entry = self.cycle_objs.get(obj_id, {})
-      cls_val = entry.get("objClass")
-      prob_val = entry.get("probExist")
-      if cls_val is not None:
+    #第一次进入, 还未初始化last_meas_counter
+    if self.last_meas_counter is None:
+      if meas_counter is None:
+        self.updated_messages.clear()
+        self.cycle_objs.clear()
+        self.cycle_ids.clear()
+        self.last_meas_counter = None
+        return None
+      self.last_meas_counter = meas_counter
+      _write_custom_log_line(f"ARS408 Obj_0_Status MeasCounter init={meas_counter}")
+      return None
+    else:
+      if meas_counter is None:
+        self.updated_messages.clear()
+        self.cycle_objs.clear()
+        self.cycle_ids.clear()
+        self.last_meas_counter = None
+        return None
+      if (meas_counter - self.last_meas_counter) >= 2:
+        meas_state = None
+        self.last_meas_counter = None
         try:
-          if int(cls_val) == 0:
-            continue
+          nof_objects = int(obj_status.get("Obj_NofObjects"))
+        except Exception:
+          nof_objects = None
+        if nof_objects is not None:
+          num_ids = len(self.cycle_ids)
+          if num_ids < nof_objects:
+            cloudlog.info(f"ARS408 cycle completeness: expected={nof_objects}, seen={num_ids}, missing={nof_objects - num_ids}, meas_counter={meas_counter}")
+          elif num_ids > nof_objects:
+            cloudlog.info(f"ARS408 cycle over-complete: expected={nof_objects}, seen={num_ids}, extra={num_ids - nof_objects}, meas_counter={meas_counter}")
+          else:
+            cloudlog.debug(f"ARS408 cycle complete: expected={nof_objects}, seen={num_ids}, meas_counter={meas_counter}")
+        # 初始化返回对象与错误列表（包含 RadarState 的故障位与 CAN 有效性）
+        ret = car.RadarData.new_message()
+        errors = []
+        if len(faults_now) > 0:
+          errors.extend(sorted(list(faults_now)))
+        if not self.rcp.can_valid:
+          errors.append("canError")
+        try:
+          if radar_state.get("RadarState_Interference") or radar_state.get("RadarState_Voltage_Error"):
+            if "interference" not in errors and int(radar_state.get("RadarState_Interference", 0)):
+              errors.append("interference")
+            if "voltageError" not in errors and int(radar_state.get("RadarState_Voltage_Error", 0)):
+              errors.append("voltageError")
         except Exception:
           pass
-      try:
-        if prob_val is None or int(prob_val) <= 1:
-          continue
-      except Exception:
-        continue
+        
+        # 门控：
+        # - 忽略点目标（Obj_Class == 0）
+        # - 需要存在概率 >25%（ProbOfExist > 1）；不足则丢弃以降低噪声
+        current_ids = set(self.cycle_ids)
+        gated_ids = set()
+        for obj_id in current_ids:
+          entry = self.cycle_objs.get(obj_id, {})
+          cls_val = entry.get("objClass")
+          prob_val = entry.get("probExist")
+          if cls_val is not None:
+            try:
+              if int(cls_val) == 0:
+                continue
+            except Exception:
+              pass
+          try:
+            if prob_val is None or int(prob_val) <= 1:
+              continue
+          except Exception:
+            continue
+          
+          gated_ids.add(obj_id)
+          if obj_id not in self.pts:
+            self.pts[obj_id] = car.RadarData.RadarPoint.new_message()
+            self.pts[obj_id].trackId = obj_id
+          # 轨迹字段单位说明：
+          # - dRel/yRel: m；vRel/yvRel: m/s；aRel: m/s^2
+          # 缺失字段使用 NaN，以区分“未测量”与有效零值
+          self.pts[obj_id].dRel = round(float(entry.get("dRel", float('nan'))), 3)
+          self.pts[obj_id].yRel = round(float(entry.get("yRel", float('nan'))), 3)
+          self.pts[obj_id].vRel = round(float(entry.get("vRel", float('nan'))), 3)
+          self.pts[obj_id].yvRel = round(float(entry.get("yvRel", float('nan'))), 3)
+          self.pts[obj_id].aRel = round(float(entry.get("aRel", float('nan'))), 3)
+          self.pts[obj_id].measured = bool(entry.get("measured", False))
+          _write_custom_log_line(
+            f"ARS408 RadarPoint trackId={obj_id}; "
+            f"dRel={self.pts[obj_id].dRel:.3f}; "
+            f"yRel={self.pts[obj_id].yRel:.3f}; "
+            f"vRel={self.pts[obj_id].vRel:.3f}; "
+            f"yvRel={self.pts[obj_id].yvRel:.3f}; "
+            f"aRel={self.pts[obj_id].aRel:.3f}; "
+            f"measured={self.pts[obj_id].measured}"
+          )
+        # 剪枝：删除未通过门控的旧轨迹，避免幽灵目标残留
+        for old_id in list(self.pts.keys()):
+          if old_id not in gated_ids:
+            del self.pts[old_id]
 
-      gated_ids.add(obj_id)
-      if obj_id not in self.pts:
-        self.pts[obj_id] = car.RadarData.RadarPoint.new_message()
-        self.pts[obj_id].trackId = obj_id
-      # 轨迹字段单位说明：
-      # - dRel/yRel: m；vRel/yvRel: m/s；aRel: m/s^2
-      # 缺失字段使用 NaN，以区分“未测量”与有效零值
-      self.pts[obj_id].dRel = round(float(entry.get("dRel", float('nan'))), 3)
-      self.pts[obj_id].yRel = round(float(entry.get("yRel", float('nan'))), 3)
-      self.pts[obj_id].vRel = round(float(entry.get("vRel", float('nan'))), 3)
-      self.pts[obj_id].yvRel = round(float(entry.get("yvRel", float('nan'))), 3)
-      self.pts[obj_id].aRel = round(float(entry.get("aRel", float('nan'))), 3)
-      self.pts[obj_id].measured = bool(entry.get("measured", False))
-      _write_custom_log_line(
-        f"ARS408 RadarPoint trackId={obj_id}; "
-        f"dRel={self.pts[obj_id].dRel:.3f}; "
-        f"yRel={self.pts[obj_id].yRel:.3f}; "
-        f"vRel={self.pts[obj_id].vRel:.3f}; "
-        f"yvRel={self.pts[obj_id].yvRel:.3f}; "
-        f"aRel={self.pts[obj_id].aRel:.3f}; "
-        f"measured={self.pts[obj_id].measured}"
-      )
-    # 剪枝：删除未通过门控的旧轨迹，避免幽灵目标残留
-    for old_id in list(self.pts.keys()):
-      if old_id not in gated_ids:
-        del self.pts[old_id]
+        ret.errors = errors
+        ret.points = list(self.pts.values())
 
-    ret.errors = errors
-    ret.points = list(self.pts.values())
-
-    # 周期结束：清空触发集合与跨调用缓冲，准备下一周期；返回解析结果。
-    self.updated_messages.clear()
-    self.cycle_objs.clear()
-    self.cycle_ids.clear()
-    return ret
+        # 周期结束：清空触发集合与跨调用缓冲，准备下一周期；返回解析结果。
+        self.updated_messages.clear()
+        self.cycle_objs.clear()
+        self.cycle_ids.clear()
+        return ret
 
   def build_motion_info(self, speed_mps: float, yaw_rate_radps: float):
     """生成 ARS408 运动信息帧供外部 sendcan 下发。
